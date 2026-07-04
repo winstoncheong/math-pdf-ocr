@@ -26,9 +26,11 @@ function getPageState(pageNum) {
   return state.pageStates[pageNum];
 }
 
-function scrollToPage(pageNum) {
+async function scrollToPage(pageNum) {
   const el = document.querySelector(`.pdf-page[data-page="${pageNum}"]`);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!el) return;
+  await loadPage(pageNum);
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ------------------------------------------------------------------ */
@@ -87,11 +89,11 @@ $('clearBtn').addEventListener('click', () => {
 /*  Page jump                                                          */
 /* ------------------------------------------------------------------ */
 const jumpInput = $('pageJump');
-jumpInput.addEventListener('keydown', e => {
+jumpInput.addEventListener('keydown', async e => {
   if (e.key === 'Enter' && state.pdfLoaded) {
     const n = parseInt(jumpInput.value);
     if (n >= 1 && n <= state.totalPages) {
-      scrollToPage(n - 1);
+      await scrollToPage(n - 1);
       jumpInput.value = n;
     }
   }
