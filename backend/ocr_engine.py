@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import urllib.request
+import warnings
 from abc import ABC, abstractmethod
 
 from PIL import Image
@@ -130,6 +131,7 @@ class TexifyEngine(OCREngine):
     def _load(self):
         if self._loaded:
             return
+        warnings.filterwarnings("ignore", message=".*use_fast.*", category=FutureWarning)
         from texify.model.model import GenerateVisionEncoderDecoderModel
         from texify.model.processor import load_processor
         logger.info("Loading texify model from HuggingFace...")
@@ -169,6 +171,62 @@ OLLAMA_PROMPT = (
     "Preserve line breaks between paragraphs. "
     "Respond ONLY with the transcription — no explanations, no preambles, no apologies."
 )
+
+
+class TexifyOnnxEngine(OCREngine):
+    MODEL_ID = "Spedon/texify-quantized-onnx"
+
+    def __init__(self):
+        self._model = None
+        self._processor = None
+        self._loaded = False
+
+    @property
+    def name(self) -> str:
+        return "texify-onnx"
+
+    @property
+    def available(self) -> bool:
+        if self._loaded:
+            return True
+        try:
+            import optimum.onnxruntime  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def _load(self):
+        if self._loaded:
+            return
+        import transformers
+        import optimum.onnxruntime
+        logging.getLogger("transformers").setLevel(logging.ERROR)
+        logging.getLogger("optimum.onnxruntime.modeling").setLevel(logging.ERROR)
+        from optimum.onnxruntime import ORTModelForVision2Seq
+        from transformers import AutoProcessor
+        logger.info("Loading texify ONNX model from HuggingFace...")
+        self._model = ORTModelForVision2Seq.from_pretrained(self.MODEL_ID)
+        self._processor = AutoProcessor.from_pretrained(self.MODEL_ID)
+        self._loaded = True
+        logger.info("Texify ONNX model loaded")
+
+    def recognize(self, image: Image.Image) -> str:
+        self._load()
+        import torch
+        images = [image.convert("RGB")]
+        encodings = self._processor(
+            images=images, return_tensors="pt", add_special_tokens=False
+        )
+        pixel_values = encodings["pixel_values"]
+        with torch.no_grad():
+            generated_ids = self._model.generate(
+                pixel_values=pixel_values,
+                max_new_tokens=384,
+            )
+        text = self._processor.tokenizer.decode(
+            generated_ids[0], skip_special_tokens=True
+        )
+        return text.strip()
 
 
 class OllamaEngine(OCREngine):
@@ -247,6 +305,8 @@ def get_engine(name: str) -> OCREngine | None:
             _engines[name] = NougatEngine()
         elif name == "texify":
             _engines[name] = TexifyEngine()
+        elif name == "texify-onnx":
+            _engines[name] = TexifyOnnxEngine()
         elif name == "ollama":
             _engines[name] = OllamaEngine()
         elif name.startswith("ollama/"):
@@ -262,7 +322,7 @@ OLLAMA_MODELS = ["llava", "glm-ocr", "qwen3-vl:8b"]
 
 def list_engines() -> list[dict]:
     result = []
-    for name in ("pix2tex", "texify"):
+    for name in ("pix2tex", "texify", "texify-onnx"):
         eng = get_engine(name)
         if eng is not None:
             result.append({"name": eng.name, "available": eng.available})

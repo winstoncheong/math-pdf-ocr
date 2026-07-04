@@ -96,6 +96,10 @@ async def startup():
     config.upload_dir.mkdir(parents=True, exist_ok=True)
     _load_recent()
     _load_last_active()
+    engine = get_engine(config.default_backend)
+    if engine is not None:
+        engine._load()
+        logger.info("Default engine '%s' loaded at startup", engine.name)
 
 
 def _get_active_pdf():

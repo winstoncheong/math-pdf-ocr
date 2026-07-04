@@ -9,5 +9,5 @@ class Config:
     ocr_dpi: int = 600
     host: str = "127.0.0.1"
     port: int = 8000
-    default_backend: str = "ollama/llava"
+    default_backend: str = "texify-onnx"
     max_upload_size_mb: int = 50
