@@ -210,8 +210,14 @@ class OllamaEngine(OCREngine):
             return False
 
     def recognize(self, image: Image.Image) -> str:
+        img = image.convert("RGB")
+        max_dim = 800
+        if max(img.size) > max_dim:
+            ratio = max_dim / max(img.size)
+            img = img.resize((int(img.width * ratio), int(img.height * ratio)), Image.LANCZOS)
+
         buf = io.BytesIO()
-        image.save(buf, format="PNG")
+        img.save(buf, format="JPEG", quality=85)
         b64 = base64.b64encode(buf.getvalue()).decode()
 
         body = json.dumps({
@@ -226,7 +232,7 @@ class OllamaEngine(OCREngine):
             method="POST",
             headers={"Content-Type": "application/json"},
         )
-        resp = urllib.request.urlopen(req, timeout=120)
+        resp = urllib.request.urlopen(req, timeout=300)
         result = json.loads(resp.read())
         return (result.get("response", "") or "").strip()
 
