@@ -35,7 +35,8 @@ async function scrollToPage(pageNum) {
   await loadPage(pageNum);
   await new Promise(r => requestAnimationFrame(r));
   await new Promise(r => requestAnimationFrame(r));
-  el.scrollIntoView({ block: 'start' });
+  const viewer = $('viewer');
+  viewer.scrollTop = el.offsetTop - $('pagesContainer').offsetTop;
   await new Promise(r => requestAnimationFrame(r));
 }
 
@@ -444,14 +445,17 @@ window.addEventListener('resize', () => {
 /*  Scroll position persistence                                        */
 /* ------------------------------------------------------------------ */
 let _scrollSaveTimer = null;
-window.addEventListener('scroll', () => {
+$('viewer').addEventListener('scroll', () => {
   if (!state.pdfLoaded) return;
   clearTimeout(_scrollSaveTimer);
   _scrollSaveTimer = setTimeout(() => {
+    const viewer = $('viewer');
     const pages = $$('.pdf-page');
     for (const p of pages) {
       const rect = p.getBoundingClientRect();
-      if (rect.top >= -100 && rect.top < window.innerHeight / 2) {
+      const viewerRect = viewer.getBoundingClientRect();
+      const relTop = rect.top - viewerRect.top;
+      if (relTop >= -100 && relTop < viewerRect.height / 2) {
         localStorage.setItem('scrollPos', p.dataset.page);
         return;
       }
