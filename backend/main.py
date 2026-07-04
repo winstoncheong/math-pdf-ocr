@@ -210,6 +210,9 @@ def _fix_katex(text: str) -> str:
     text = re.sub(r'\\tag\{.*?\}', '', text)
     text = re.sub(r'\\quad\\mbox\{(.*?)\}', r'\1', text)
     text = re.sub(r'\\mbox\{(.*?)\}', r'\1', text)
+    # Convert markdown _italic_ to \emph{} — only when not preceded by a
+    # word char (which would mean it's a LaTeX subscript like a_1).
+    text = re.sub(r'(?<!\w)_([^_\n]+?)_(?!\w)', r'\\emph{\1}', text)
     return text
 
 
