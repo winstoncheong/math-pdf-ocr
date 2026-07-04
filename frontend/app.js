@@ -112,9 +112,17 @@ async function loadBackends() {
       opt.disabled = !b.available;
       sel.appendChild(opt);
     }
-    if (avail.find(b => b.name === 'ollama/llava')) state.backend = 'ollama/llava';
-    else if (avail.length) state.backend = avail[0].name;
-    else state.backend = '';
+    // Preserve current selection if still available, otherwise pick a default
+    if (state.backend && avail.find(b => b.name === state.backend)) {
+      // keep state.backend as-is
+    } else if (avail.find(b => b.name === 'ollama/llava')) {
+      state.backend = 'ollama/llava';
+    } else if (avail.length) {
+      state.backend = avail[0].name;
+    } else {
+      state.backend = '';
+    }
+    sel.value = state.backend;
   } catch { }
 }
 
