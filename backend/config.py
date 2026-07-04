@@ -6,7 +6,7 @@ from pathlib import Path
 class Config:
     upload_dir: Path = field(default_factory=lambda: Path("uploads"))
     render_dpi: int = 200
-    ocr_dpi: int = 400
+    ocr_dpi: int = 600
     host: str = "127.0.0.1"
     port: int = 8000
     default_backend: str = "pix2tex"

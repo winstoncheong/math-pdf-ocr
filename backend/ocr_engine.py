@@ -106,9 +106,10 @@ class NougatEngine(OCREngine):
 
 OLLAMA_DEFAULT_MODEL = "llava"
 OLLAMA_PROMPT = (
-    "Extract all text from this image exactly as shown. "
-    "Render any mathematical expressions as LaTeX ($...$ for inline, $$...$$ for display). "
-    "Return only the extracted content with no commentary."
+    "Transcribe all visible text and mathematical notation from this image exactly as shown. "
+    "Render math expressions as LaTeX ($...$ for inline, $$...$$ for display). "
+    "Preserve line breaks between paragraphs. "
+    "Respond ONLY with the transcription — no explanations, no preambles, no apologies."
 )
 
 

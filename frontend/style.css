@@ -197,6 +197,18 @@ input[type=number]::-webkit-outer-spin-button {
   width: 80px;
 }
 
+#ocrDpiControl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #a0a0b0;
+}
+
+#ocrDpiSlider {
+  width: 80px;
+}
+
 #backendControl select {
   background: #0f3460;
   color: #e0e0e0;

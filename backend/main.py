@@ -110,6 +110,7 @@ async def ocr_region(
     x2: int,
     y2: int,
     dpi: int = Query(default=200, ge=72, le=600),
+    ocr_dpi: int = Query(default=0, ge=100, le=1200),
     backend: str = Query(default=""),
 ):
     path = _get_active_pdf()
@@ -123,9 +124,10 @@ async def ocr_region(
     if not engine.available:
         raise HTTPException(400, f"Backend '{engine_name}' is not installed")
 
-    crop = extract_region(path, page_num, x1, y1, x2, y2, render_dpi=dpi, ocr_dpi=config.ocr_dpi)
+    actual_ocr_dpi = ocr_dpi if ocr_dpi > 0 else config.ocr_dpi
+    crop = extract_region(path, page_num, x1, y1, x2, y2, render_dpi=dpi, ocr_dpi=actual_ocr_dpi)
     latex = engine.recognize(crop)
-    return {"latex": latex, "backend": engine_name}
+    return {"latex": latex, "backend": engine_name, "ocr_dpi": actual_ocr_dpi}
 
 
 @app.get("/backends")

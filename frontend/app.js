@@ -2,6 +2,7 @@ const state = {
   pdfLoaded: false,
   totalPages: 0,
   dpi: 200,
+  ocrDpi: 600,
   backend: 'pix2tex',
   results: [],
   pageStates: {},
@@ -64,6 +65,14 @@ $('dpiSlider').addEventListener('input', e => {
   state.dpi = parseInt(e.target.value);
   $('dpiValue').textContent = state.dpi;
   if (state.pdfLoaded) reloadVisiblePages();
+});
+
+/* ------------------------------------------------------------------ */
+/*  OCR DPI slider                                                     */
+/* ------------------------------------------------------------------ */
+$('ocrDpiSlider').addEventListener('input', e => {
+  state.ocrDpi = parseInt(e.target.value);
+  $('ocrDpiValue').textContent = state.ocrDpi;
 });
 
 /* ------------------------------------------------------------------ */
@@ -325,6 +334,7 @@ async function runOcr(pageNum, x1, y1, x2, y2) {
     const params = new URLSearchParams({
       page_num: pageNum, x1, y1, x2, y2,
       dpi: state.dpi,
+      ocr_dpi: state.ocrDpi,
       backend: state.backend,
     });
     const r = await fetch('/ocr?' + params.toString(), { method: 'POST' });
