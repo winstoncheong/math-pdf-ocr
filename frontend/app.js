@@ -3,13 +3,15 @@ const state = {
   totalPages: 0,
   dpi: 200,
   ocrDpi: 600,
-  showRaw: false,
-  backend: 'pix2tex',
+  backend: 'ollama/llava',
   results: [],
   pageStates: {},
   activePage: null,
   observer: null,
   recentOpen: false,
+  ocrQueue: [],
+  ocrRunning: 0,
+  ocrMaxConcurrent: 3,
 };
 
 const $ = id => document.getElementById(id);
@@ -52,7 +54,8 @@ async function loadBackends() {
       opt.disabled = !b.available;
       sel.appendChild(opt);
     }
-    if (avail.length) state.backend = avail[0].name;
+    if (avail.find(b => b.name === 'ollama/llava')) state.backend = 'ollama/llava';
+    else if (avail.length) state.backend = avail[0].name;
     else state.backend = '';
   } catch { }
 }
@@ -86,11 +89,7 @@ $('clearBtn').addEventListener('click', () => {
   renderResults();
 });
 
-$('rawToggle').addEventListener('click', () => {
-  state.showRaw = !state.showRaw;
-  $('rawToggle').textContent = state.showRaw ? 'Render' : 'Raw';
-  renderResults();
-});
+
 
 /* ------------------------------------------------------------------ */
 /*  Page jump                                                          */
@@ -328,32 +327,76 @@ document.addEventListener('mouseup', async e => {
 
   const sx = ps.renderedW / ps.displayW;
   const sy = ps.renderedH / ps.displayH;
-  await runOcr(pageNum,
-    Math.round(x1 * sx), Math.round(y1 * sy),
-    Math.round(x2 * sx), Math.round(y2 * sy));
+  const rx1 = Math.round(x1 * sx);
+  const ry1 = Math.round(y1 * sy);
+  const rx2 = Math.round(x2 * sx);
+  const ry2 = Math.round(y2 * sy);
+
+  const previewUrl = captureRegionPreview(pageDiv.querySelector('img'), x1, y1, x2, y2);
+  enqueueOcr(pageNum, rx1, ry1, rx2, ry2, previewUrl);
 });
 
-async function runOcr(pageNum, x1, y1, x2, y2) {
+function captureRegionPreview(imgEl, x1, y1, x2, y2) {
+  const scaleX = imgEl.naturalWidth / imgEl.clientWidth;
+  const scaleY = imgEl.naturalHeight / imgEl.clientHeight;
+  const sx = x1 * scaleX, sy = y1 * scaleY;
+  const sw = (x2 - x1) * scaleX, sh = (y2 - y1) * scaleY;
+  const c = document.createElement('canvas');
+  c.width = sw;
+  c.height = sh;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, sw, sh);
+  return c.toDataURL('image/png');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Async OCR queue                                                    */
+/* ------------------------------------------------------------------ */
+function enqueueOcr(pageNum, x1, y1, x2, y2, previewUrl) {
   if (!state.backend) {
-    addResult('No OCR backend available. Install pix2tex: pip install pix2tex[api]');
+    addResult('No OCR backend available. Install pix2tex: pip install pix2tex[api]', null, previewUrl);
     return;
   }
-  showLoading('Running OCR...');
+  const id = Date.now() + Math.random();
+  const item = { id, pageNum, x1, y1, x2, y2, previewUrl, status: 'queued', latex: null, backend: null, showRaw: true };
+  state.results.unshift(item);
+  renderResults();
+  state.ocrQueue.push(item);
+  processQueue();
+}
+
+async function processQueue() {
+  while (state.ocrRunning < state.ocrMaxConcurrent && state.ocrQueue.length > 0) {
+    const item = state.ocrQueue.shift();
+    state.ocrRunning++;
+    runOcr(item).finally(() => {
+      state.ocrRunning--;
+      processQueue();
+    });
+  }
+}
+
+async function runOcr(item) {
+  item.status = 'running';
+  renderResults();
   try {
     const params = new URLSearchParams({
-      page_num: pageNum, x1, y1, x2, y2,
+      page_num: item.pageNum, x1: item.x1, y1: item.y1, x2: item.x2, y2: item.y2,
       dpi: state.dpi,
       ocr_dpi: state.ocrDpi,
       backend: state.backend,
     });
     const r = await fetch('/ocr?' + params.toString(), { method: 'POST' });
-    if (!r.ok) { addResult('OCR error: ' + await r.text()); return; }
+    if (!r.ok) { item.latex = 'OCR error: ' + await r.text(); item.status = 'error'; return; }
     const data = await r.json();
-    addResult(data.latex, data.backend);
+    item.latex = data.latex;
+    item.backend = data.backend;
+    item.status = 'done';
   } catch (err) {
-    addResult('Request failed: ' + err.message);
+    item.latex = 'Request failed: ' + err.message;
+    item.status = 'error';
   } finally {
-    hideLoading();
+    renderResults();
   }
 }
 
@@ -415,8 +458,8 @@ document.addEventListener('click', e => {
 /* ------------------------------------------------------------------ */
 /*  Results                                                            */
 /* ------------------------------------------------------------------ */
-function addResult(latex, backend) {
-  state.results.unshift({ latex, backend: backend || 'unknown', ts: new Date() });
+function addResult(latex, backend, previewUrl) {
+  state.results.unshift({ latex, backend: backend || 'unknown', ts: new Date(), previewUrl: previewUrl || null, status: 'done', id: Date.now(), showRaw: true });
   renderResults();
 }
 
@@ -428,7 +471,13 @@ function renderResults() {
   }
   container.innerHTML = state.results.map((r, i) => {
     let rendered;
-    if (state.showRaw) {
+    if (r.status === 'queued') {
+      rendered = '<span class="status-queued">Queued...</span>';
+    } else if (r.status === 'running') {
+      rendered = '<span class="status-running">Processing...</span>';
+    } else if (r.status === 'error') {
+      rendered = `<pre class="raw-output">${escapeHtml(r.latex)}</pre>`;
+    } else if (r.showRaw) {
       rendered = `<pre class="raw-output">${escapeHtml(r.latex)}</pre>`;
     } else {
       try {
@@ -437,15 +486,21 @@ function renderResults() {
         rendered = escapeHtml(r.latex);
       }
     }
-    const ts = r.ts.toLocaleTimeString();
+    const ts = r.ts ? r.ts.toLocaleTimeString() : '';
+    const preview = r.previewUrl ? `<img class="result-preview" src="${r.previewUrl}" alt="Selected region">` : '';
+    const toggleBtn = r.status === 'done' ? `<button class="result-raw-toggle" onclick="toggleResultRaw(${i})" title="Toggle raw/rendered view">${r.showRaw ? 'Render' : 'Raw'}</button>` : '';
     return `<div class="result-card">
       <div class="result-header">
         <span>${ts}</span>
-        <span class="result-backend">${escapeHtml(r.backend)}</span>
+        <span class="result-header-right">
+          <span class="result-backend">${escapeHtml(r.backend || '')}</span>
+          ${toggleBtn}
+        </span>
       </div>
+      ${preview}
       <div class="result-latex">${rendered}</div>
       <div class="result-actions">
-        <button onclick="copyResult(${i})">Copy LaTeX</button>
+        ${r.status === 'done' ? `<button onclick="copyResult(${i})">Copy LaTeX</button>` : ''}
         <button onclick="removeResult(${i})">Remove</button>
       </div>
     </div>`;
@@ -453,9 +508,14 @@ function renderResults() {
   container.scrollTop = 0;
 }
 
+function toggleResultRaw(i) {
+  state.results[i].showRaw = !state.results[i].showRaw;
+  renderResults();
+}
+
 function copyResult(i) {
   const r = state.results[i];
-  if (r) navigator.clipboard.writeText(r.latex).catch(() => {});
+  if (r && r.latex) navigator.clipboard.writeText(r.latex).catch(() => {});
 }
 
 function removeResult(i) {
@@ -480,6 +540,40 @@ function hideLoading() {
   const el = $('loading');
   if (el) el.style.display = 'none';
 }
+
+/* ------------------------------------------------------------------ */
+/*  Split divider                                                      */
+/* ------------------------------------------------------------------ */
+(function initSplitDivider() {
+  const divider = $('splitDivider');
+  const results = $('results');
+  let dragging = false;
+
+  divider.addEventListener('mousedown', e => {
+    e.preventDefault();
+    dragging = true;
+    divider.classList.add('active');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const mainRect = $('main').getBoundingClientRect();
+    const maxW = mainRect.width - 200;
+    let w = mainRect.right - e.clientX;
+    w = Math.max(200, Math.min(w, maxW));
+    results.style.width = w + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    divider.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
 
 /* ------------------------------------------------------------------ */
 /*  Init                                                               */
