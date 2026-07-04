@@ -105,9 +105,14 @@ class NougatEngine(OCREngine):
 
 
 class TexifyEngine(OCREngine):
+    MODEL_ID = "vikp/texify"
+    IMG_SIZE = (420, 420)
+    MEAN = [0.485, 0.456, 0.406]
+    STD = [0.229, 0.224, 0.225]
+
     def __init__(self):
         self._model = None
-        self._processor = None
+        self._tokenizer = None
         self._loaded = False
 
     @property
@@ -127,20 +132,35 @@ class TexifyEngine(OCREngine):
     def _load(self):
         if self._loaded:
             return
-        from transformers import VisionEncoderDecoderModel, AutoProcessor
+        from transformers import VisionEncoderDecoderModel, NougatTokenizerFast
         logger.info("Loading texify model from HuggingFace...")
-        self._model = VisionEncoderDecoderModel.from_pretrained("vikp/texify")
-        self._processor = AutoProcessor.from_pretrained("vikp/texify")
+        self._model = VisionEncoderDecoderModel.from_pretrained(self.MODEL_ID)
+        self._tokenizer = NougatTokenizerFast.from_pretrained(self.MODEL_ID)
         self._loaded = True
         logger.info("Texify model loaded")
+
+    def _preprocess(self, image: Image.Image):
+        import numpy as np
+        img = image.convert("RGB").resize(self.IMG_SIZE, Image.BICUBIC)
+        arr = np.array(img, dtype=np.float32) / 255.0
+        mean = np.array(self.MEAN, dtype=np.float32)
+        std = np.array(self.STD, dtype=np.float32)
+        arr = (arr - mean) / std
+        import torch
+        return torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
 
     def recognize(self, image: Image.Image) -> str:
         self._load()
         import torch
-        pixel_values = self._processor(images=image.convert("RGB"), return_tensors="pt").pixel_values
+        pixel_values = self._preprocess(image)
+        decoder_input_ids = self._tokenizer("<s>", return_tensors="pt").input_ids
         with torch.no_grad():
-            outputs = self._model.generate(pixel_values)
-        return self._processor.decode(outputs[0], skip_special_tokens=True)
+            outputs = self._model.generate(
+                pixel_values=pixel_values,
+                decoder_input_ids=decoder_input_ids,
+                max_length=512,
+            )
+        return self._tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
 
 OLLAMA_DEFAULT_MODEL = "llava"
