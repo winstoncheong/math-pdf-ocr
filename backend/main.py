@@ -123,7 +123,7 @@ async def ocr_region(
     if not engine.available:
         raise HTTPException(400, f"Backend '{engine_name}' is not installed")
 
-    crop = extract_region(path, page_num, x1, y1, x2, y2, dpi=dpi)
+    crop = extract_region(path, page_num, x1, y1, x2, y2, render_dpi=dpi, ocr_dpi=config.ocr_dpi)
     latex = engine.recognize(crop)
     return {"latex": latex, "backend": engine_name}
 
