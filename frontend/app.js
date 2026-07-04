@@ -41,6 +41,60 @@ async function scrollToPage(pageNum) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  LocalStorage persistence                                           */
+/* ------------------------------------------------------------------ */
+const STORAGE_KEY = 'mathPdfOcrState';
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      dpi: state.dpi,
+      ocrDpi: state.ocrDpi,
+      backend: state.backend,
+      results: state.results.map(r => ({
+        pageNum: r.pageNum,
+        x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2,
+        previewUrl: r.previewUrl,
+        latex: r.latex,
+        backend: r.backend,
+        status: r.status,
+        showRaw: r.showRaw,
+      })),
+    }));
+  } catch { }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved.dpi != null) {
+      state.dpi = saved.dpi;
+      $('dpiSlider').value = saved.dpi;
+      $('dpiValue').textContent = saved.dpi;
+    }
+    if (saved.ocrDpi != null) {
+      state.ocrDpi = saved.ocrDpi;
+      $('ocrDpiSlider').value = saved.ocrDpi;
+      $('ocrDpiValue').textContent = saved.ocrDpi;
+    }
+    if (saved.backend) {
+      state.backend = saved.backend;
+      $('backendSelect').value = saved.backend;
+    }
+    if (saved.results && saved.results.length) {
+      state.results = saved.results.map(r => ({
+        ...r,
+        ts: new Date(),
+        id: Date.now() + Math.random(),
+      }));
+      renderResults();
+    }
+  } catch { }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Backend loading                                                    */
 /* ------------------------------------------------------------------ */
 async function loadBackends() {
@@ -66,6 +120,7 @@ async function loadBackends() {
 
 $('backendSelect').addEventListener('change', e => {
   state.backend = e.target.value;
+  saveState();
 });
 
 /* ------------------------------------------------------------------ */
@@ -74,6 +129,7 @@ $('backendSelect').addEventListener('change', e => {
 $('dpiSlider').addEventListener('input', e => {
   state.dpi = parseInt(e.target.value);
   $('dpiValue').textContent = state.dpi;
+  saveState();
   if (state.pdfLoaded) reloadVisiblePages();
 });
 
@@ -83,6 +139,7 @@ $('dpiSlider').addEventListener('input', e => {
 $('ocrDpiSlider').addEventListener('input', e => {
   state.ocrDpi = parseInt(e.target.value);
   $('ocrDpiValue').textContent = state.ocrDpi;
+  saveState();
 });
 
 /* ------------------------------------------------------------------ */
@@ -91,6 +148,7 @@ $('ocrDpiSlider').addEventListener('input', e => {
 $('clearBtn').addEventListener('click', () => {
   state.results = [];
   renderResults();
+  saveState();
 });
 
 
@@ -557,6 +615,7 @@ function renderResults() {
     </div>`;
   }).join('');
   container.scrollTop = 0;
+  saveState();
 }
 
 function toggleResultRaw(i) {
@@ -695,6 +754,7 @@ function hideLoading() {
 /* ------------------------------------------------------------------ */
 async function init() {
   await loadBackends();
+  loadState();
   await loadRecentFiles();
   try {
     const r = await fetch('/info');
