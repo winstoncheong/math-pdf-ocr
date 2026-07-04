@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 pix2tex = ["pix2tex[api]"]
 nougat = ["nougat-ocr"]
+texify = ["texify"]
 
 [tool.uv]
 dev-dependencies = []

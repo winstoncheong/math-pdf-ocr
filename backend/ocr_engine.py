@@ -104,6 +104,44 @@ class NougatEngine(OCREngine):
         return self._processor.batch_decode(outputs, skip_special_tokens=True)[0]
 
 
+class TexifyEngine(OCREngine):
+    def __init__(self):
+        self._model = None
+        self._processor = None
+        self._loaded = False
+
+    @property
+    def name(self) -> str:
+        return "texify"
+
+    @property
+    def available(self) -> bool:
+        if self._loaded:
+            return True
+        try:
+            import texify  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def _load(self):
+        if self._loaded:
+            return
+        from texify.model.model import load_model
+        from texify.model.processor import load_processor
+        logger.info("Loading texify model...")
+        self._processor = load_processor()
+        self._model = load_model()
+        self._loaded = True
+        logger.info("Texify model loaded")
+
+    def recognize(self, image: Image.Image) -> str:
+        self._load()
+        from texify.inference import batch_inference
+        results = batch_inference([image.convert("RGB")], self._model, self._processor)
+        return results[0] if results else ""
+
+
 OLLAMA_DEFAULT_MODEL = "llava"
 OLLAMA_PROMPT = (
     "Transcribe all visible text and mathematical notation from this image exactly as shown. "
@@ -181,6 +219,8 @@ def get_engine(name: str) -> OCREngine | None:
             _engines[name] = Pix2texEngine()
         elif name == "nougat":
             _engines[name] = NougatEngine()
+        elif name == "texify":
+            _engines[name] = TexifyEngine()
         elif name == "ollama":
             _engines[name] = OllamaEngine()
         elif name.startswith("ollama/"):
@@ -191,10 +231,16 @@ def get_engine(name: str) -> OCREngine | None:
     return _engines[name]
 
 
+OLLAMA_MODELS = ["llava", "glm-ocr", "qwen3-vl:8b"]
+
+
 def list_engines() -> list[dict]:
     result = []
-    for name in ("pix2tex", "nougat", "ollama"):
+    for name in ("pix2tex", "texify"):
         eng = get_engine(name)
         if eng is not None:
             result.append({"name": eng.name, "available": eng.available})
+    for model in OLLAMA_MODELS:
+        eng = get_engine(f"ollama/{model}")
+        result.append({"name": eng.name, "available": eng.available})
     return result
