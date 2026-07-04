@@ -597,6 +597,7 @@ function renderResults() {
     const preview = r.previewUrl ? `<img class="result-preview" src="${r.previewUrl}" alt="Selected region">` : '';
     const toggleBtn = r.status === 'done' ? `<button class="result-raw-toggle" onclick="toggleResultRaw(${i})" title="Toggle raw/rendered view">${r.showRaw ? 'Render' : 'Raw'}</button>` : '';
     const resendBtn = (r.pageNum !== undefined && r.x1 !== undefined) ? `<button onclick="resendResult(${i})" title="Re-run OCR with current backend">Resend</button>` : '';
+    const createTestBtn = (r.pageNum !== undefined && r.x1 !== undefined && r.previewUrl) ? `<button onclick="openCreateTest(${i})" title="Create a test case from this region">Create test</button>` : '';
     return `<div class="result-card">
       <div class="result-header">
         <span>${ts}</span>
@@ -609,6 +610,7 @@ function renderResults() {
       <div class="result-latex">${rendered}</div>
       <div class="result-actions">
         ${resendBtn}
+        ${createTestBtn}
         ${r.status === 'done' ? `<button onclick="copyResult(${i})">Copy LaTeX</button>` : ''}
         <button onclick="removeResult(${i})">Remove</button>
       </div>
@@ -638,6 +640,91 @@ function resendResult(i) {
   if (!r || r.pageNum === undefined) return;
   enqueueOcr(r.pageNum, r.x1, r.y1, r.x2, r.y2, r.previewUrl);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Create test case modal                                             */
+/* ------------------------------------------------------------------ */
+let _createTestResultIdx = null;
+
+async function openCreateTest(i) {
+  const r = state.results[i];
+  if (!r || !r.previewUrl) return;
+  _createTestResultIdx = i;
+
+  $('testModalPreview').src = r.previewUrl;
+  $('testNameInput').value = 'test' + (Date.now() % 10000);
+  $('testExpectedInput').value = '';
+
+  $('testModal').style.display = 'flex';
+  $('testNameInput').focus();
+
+  // Run texify to pre-fill expected output
+  $('testExpectedInput').value = 'Running texify...';
+  try {
+    const params = new URLSearchParams({
+      page_num: r.pageNum, x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2,
+      dpi: state.dpi, ocr_dpi: state.ocrDpi, backend: 'texify',
+    });
+    const resp = await fetch('/ocr?' + params.toString(), { method: 'POST' });
+    if (resp.ok) {
+      const data = await resp.json();
+      $('testExpectedInput').value = data.latex;
+    } else {
+      $('testExpectedInput').value = '';
+    }
+  } catch {
+    $('testExpectedInput').value = '';
+  }
+  $('testExpectedInput').focus();
+}
+
+$('testModalClose').addEventListener('click', closeCreateTest);
+$('testModalCancel').addEventListener('click', closeCreateTest);
+$('testModal').addEventListener('click', e => {
+  if (e.target === $('testModal')) closeCreateTest();
+});
+
+function closeCreateTest() {
+  $('testModal').style.display = 'none';
+  _createTestResultIdx = null;
+}
+
+$('testModalSave').addEventListener('click', async () => {
+  const r = state.results[_createTestResultIdx];
+  if (!r || !r.previewUrl) return;
+
+  const name = $('testNameInput').value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  const expected = $('testExpectedInput').value.trim();
+  if (!name || !expected) {
+    alert('Name and expected output are required.');
+    return;
+  }
+
+  $('testModalSave').disabled = true;
+  $('testModalSave').textContent = 'Saving...';
+  try {
+    const resp = await fetch('/save-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        expected,
+        image: r.previewUrl,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      alert('Save failed: ' + err);
+    } else {
+      closeCreateTest();
+    }
+  } catch (err) {
+    alert('Save failed: ' + err.message);
+  } finally {
+    $('testModalSave').disabled = false;
+    $('testModalSave').textContent = 'Save test';
+  }
+});
 
 function escapeHtml(str) {
   const d = document.createElement('div');

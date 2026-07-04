@@ -263,6 +263,37 @@ async def backends():
     }
 
 
+TEST_DIR = Path(__file__).resolve().parent.parent / "test-data"
+
+
+@app.post("/save-test")
+async def save_test(body: dict):
+    import base64
+    name = body.get("name", "").strip()
+    expected = body.get("expected", "").strip()
+    image_data_url = body.get("image", "")
+
+    if not name or not expected:
+        raise HTTPException(400, "name and expected are required")
+    if not re.match(r'^[a-zA-Z0-9_-]+$', name):
+        raise HTTPException(400, "name must be alphanumeric (with _ and -)")
+
+    TEST_DIR.mkdir(exist_ok=True)
+
+    # Save expected LaTeX
+    tex_path = TEST_DIR / f"{name}.tex"
+    tex_path.write_text(expected, encoding="utf-8")
+
+    # Save image from data URL
+    if image_data_url.startswith("data:image/"):
+        header, b64data = image_data_url.split(",", 1)
+        img_bytes = base64.b64decode(b64data)
+        img_path = TEST_DIR / f"{name}.png"
+        img_path.write_bytes(img_bytes)
+
+    return {"ok": True, "name": name}
+
+
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 if frontend_dir.exists():
     app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
