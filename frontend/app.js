@@ -3,7 +3,7 @@ const state = {
   totalPages: 0,
   dpi: 200,
   ocrDpi: 600,
-  backend: 'ollama/llava',
+  backend: 'texify',
   results: [],
   pageStates: {},
   activePage: null,
@@ -115,8 +115,8 @@ async function loadBackends() {
     // Preserve current selection if still available, otherwise pick a default
     if (state.backend && avail.find(b => b.name === state.backend)) {
       // keep state.backend as-is
-    } else if (avail.find(b => b.name === 'ollama/llava')) {
-      state.backend = 'ollama/llava';
+    } else if (avail.find(b => b.name === 'texify')) {
+      state.backend = 'texify';
     } else if (avail.length) {
       state.backend = avail[0].name;
     } else {
