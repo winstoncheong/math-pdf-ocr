@@ -1,4 +1,8 @@
+import base64
+import io
+import json
 import logging
+import urllib.request
 from abc import ABC, abstractmethod
 
 from PIL import Image
@@ -100,6 +104,73 @@ class NougatEngine(OCREngine):
         return self._processor.batch_decode(outputs, skip_special_tokens=True)[0]
 
 
+OLLAMA_DEFAULT_MODEL = "llava"
+OLLAMA_PROMPT = (
+    "Extract all text from this image exactly as shown. "
+    "Render any mathematical expressions as LaTeX ($...$ for inline, $$...$$ for display). "
+    "Return only the extracted content with no commentary."
+)
+
+
+class OllamaEngine(OCREngine):
+    def __init__(self, model: str = OLLAMA_DEFAULT_MODEL):
+        self._model_name = model
+        self._base_url = "http://127.0.0.1:11434"
+        self._checked = False
+        self._available = False
+
+    @property
+    def name(self) -> str:
+        return f"ollama/{self._model_name}"
+
+    @property
+    def available(self) -> bool:
+        if self._checked:
+            return self._available
+        self._checked = True
+        try:
+            req = urllib.request.Request(
+                f"{self._base_url}/api/tags",
+                method="GET",
+                headers={"Accept": "application/json"},
+            )
+            resp = urllib.request.urlopen(req, timeout=3)
+            if resp.status != 200:
+                return False
+            data = json.loads(resp.read())
+            models = [m["name"] for m in data.get("models", [])]
+            # accept name with or without :latest
+            ok = any(m.split(":")[0] == self._model_name or m == self._model_name for m in models)
+            if not ok:
+                logger.warning("Ollama model '%s' not found. Available: %s", self._model_name, models)
+            self._available = ok
+            return ok
+        except Exception as e:
+            logger.warning("Ollama not available: %s", e)
+            return False
+
+    def recognize(self, image: Image.Image) -> str:
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+
+        body = json.dumps({
+            "model": self._model_name,
+            "prompt": OLLAMA_PROMPT,
+            "images": [b64],
+            "stream": False,
+        }).encode()
+        req = urllib.request.Request(
+            f"{self._base_url}/api/generate",
+            data=body,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        resp = urllib.request.urlopen(req, timeout=120)
+        result = json.loads(resp.read())
+        return (result.get("response", "") or "").strip()
+
+
 _engines: dict[str, OCREngine] = {}
 
 
@@ -109,6 +180,11 @@ def get_engine(name: str) -> OCREngine | None:
             _engines[name] = Pix2texEngine()
         elif name == "nougat":
             _engines[name] = NougatEngine()
+        elif name == "ollama":
+            _engines[name] = OllamaEngine()
+        elif name.startswith("ollama/"):
+            model = name.split("/", 1)[1]
+            _engines[name] = OllamaEngine(model=model)
         else:
             return None
     return _engines[name]
@@ -116,7 +192,7 @@ def get_engine(name: str) -> OCREngine | None:
 
 def list_engines() -> list[dict]:
     result = []
-    for name in ("pix2tex", "nougat"):
+    for name in ("pix2tex", "nougat", "ollama"):
         eng = get_engine(name)
         if eng is not None:
             result.append({"name": eng.name, "available": eng.available})
