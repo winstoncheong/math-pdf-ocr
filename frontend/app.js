@@ -533,11 +533,7 @@ function renderResults() {
     } else if (r.showRaw) {
       rendered = `<pre class="raw-output">${escapeHtml(r.latex)}</pre>`;
     } else {
-      try {
-        rendered = katex.renderToString(r.latex, { throwOnError: false, displayMode: true });
-      } catch {
-        rendered = escapeHtml(r.latex);
-      }
+      rendered = renderLatexText(r.latex);
     }
     const ts = r.ts ? r.ts.toLocaleTimeString() : '';
     const preview = r.previewUrl ? `<img class="result-preview" src="${r.previewUrl}" alt="Selected region">` : '';
@@ -588,6 +584,64 @@ function escapeHtml(str) {
   const d = document.createElement('div');
   d.textContent = str;
   return d.innerHTML;
+}
+
+function renderLatexText(text) {
+  // Split on $$...$$ (display) and $...$ (inline) math delimiters
+  // then render math fragments with KaTeX and escape plain text
+  const parts = [];
+  let remaining = text;
+
+  // First extract display math $$...$$
+  const displayRe = /\$\$([\s\S]*?)\$\$/g;
+  let lastIdx = 0;
+  let m;
+  while ((m = displayRe.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      parts.push({ type: 'text', content: text.slice(lastIdx, m.index) });
+    }
+    parts.push({ type: 'display', content: m[1] });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) {
+    parts.push({ type: 'text', content: text.slice(lastIdx) });
+  }
+
+  // Now extract inline math $...$ from text parts
+  const final = [];
+  const inlineRe = /\$([^\$]+?)\$/g;
+  for (const part of parts) {
+    if (part.type !== 'text') {
+      final.push(part);
+      continue;
+    }
+    let last = 0;
+    let im;
+    inlineRe.lastIndex = 0;
+    while ((im = inlineRe.exec(part.content)) !== null) {
+      if (im.index > last) {
+        final.push({ type: 'text', content: part.content.slice(last, im.index) });
+      }
+      final.push({ type: 'inline', content: im[1] });
+      last = im.index + im[0].length;
+    }
+    if (last < part.content.length) {
+      final.push({ type: 'text', content: part.content.slice(last) });
+    }
+  }
+
+  // Render each part
+  return final.map(part => {
+    if (part.type === 'text') {
+      return escapeHtml(part.content).replace(/\n/g, '<br>');
+    }
+    try {
+      const displayMode = part.type === 'display';
+      return katex.renderToString(part.content, { throwOnError: false, displayMode });
+    } catch {
+      return escapeHtml(part.content);
+    }
+  }).join('');
 }
 
 function showLoading(msg) {
