@@ -33,7 +33,10 @@ async function scrollToPage(pageNum) {
   const el = document.querySelector(`.pdf-page[data-page="${pageNum}"]`);
   if (!el) return;
   await loadPage(pageNum);
+  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => requestAnimationFrame(r));
   el.scrollIntoView({ block: 'start' });
+  await new Promise(r => requestAnimationFrame(r));
 }
 
 /* ------------------------------------------------------------------ */
@@ -634,7 +637,9 @@ async function init() {
       if (data.file_id) {
         await reopenFile(data.file_id);
         const saved = localStorage.getItem('scrollPos');
-        if (saved) scrollToPage(parseInt(saved));
+        if (saved) {
+          await scrollToPage(parseInt(saved));
+        }
       }
     }
   } catch { }
