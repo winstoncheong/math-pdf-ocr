@@ -3,6 +3,7 @@ const state = {
   totalPages: 0,
   dpi: 200,
   ocrDpi: 600,
+  showRaw: false,
   backend: 'pix2tex',
   results: [],
   pageStates: {},
@@ -30,7 +31,7 @@ async function scrollToPage(pageNum) {
   const el = document.querySelector(`.pdf-page[data-page="${pageNum}"]`);
   if (!el) return;
   await loadPage(pageNum);
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.scrollIntoView({ block: 'start' });
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,6 +83,12 @@ $('ocrDpiSlider').addEventListener('input', e => {
 /* ------------------------------------------------------------------ */
 $('clearBtn').addEventListener('click', () => {
   state.results = [];
+  renderResults();
+});
+
+$('rawToggle').addEventListener('click', () => {
+  state.showRaw = !state.showRaw;
+  $('rawToggle').textContent = state.showRaw ? 'Render' : 'Raw';
   renderResults();
 });
 
@@ -421,10 +428,14 @@ function renderResults() {
   }
   container.innerHTML = state.results.map((r, i) => {
     let rendered;
-    try {
-      rendered = katex.renderToString(r.latex, { throwOnError: false, displayMode: true });
-    } catch {
-      rendered = escapeHtml(r.latex);
+    if (state.showRaw) {
+      rendered = `<pre class="raw-output">${escapeHtml(r.latex)}</pre>`;
+    } else {
+      try {
+        rendered = katex.renderToString(r.latex, { throwOnError: false, displayMode: true });
+      } catch {
+        rendered = escapeHtml(r.latex);
+      }
     }
     const ts = r.ts.toLocaleTimeString();
     return `<div class="result-card">
