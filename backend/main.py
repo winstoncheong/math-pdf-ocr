@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import sys
 import time
@@ -21,9 +22,79 @@ _uploads: dict[str, dict] = {}
 _active_pdf: dict = {"path": None, "pages": 0, "file_id": None}
 
 
+def _recent_json_path() -> Path:
+    return config.upload_dir / "recent.json"
+
+
+def _last_active_json_path() -> Path:
+    return config.upload_dir / "last_active.json"
+
+
+def _save_recent():
+    data = {}
+    for fid, info in _uploads.items():
+        data[fid] = {
+            "path": str(info["path"]),
+            "filename": info["filename"],
+            "pages": info["pages"],
+            "ts": info.get("ts", 0),
+        }
+    _recent_json_path().write_text(json.dumps(data, indent=2))
+
+
+def _load_recent():
+    path = _recent_json_path()
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to load recent.json: %s", e)
+        return
+    for fid, info in data.items():
+        file_path = Path(info["path"])
+        if file_path.exists():
+            _uploads[fid] = {
+                "path": info["path"],
+                "filename": info["filename"],
+                "pages": info["pages"],
+                "ts": info.get("ts", 0),
+            }
+        else:
+            logger.info("Skipping missing file from recent: %s", info["path"])
+
+
+def _save_last_active():
+    if _active_pdf["file_id"] is None:
+        return
+    data = {"file_id": _active_pdf["file_id"]}
+    _last_active_json_path().write_text(json.dumps(data))
+
+
+def _load_last_active():
+    path = _last_active_json_path()
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return
+    fid = data.get("file_id")
+    if fid and fid in _uploads:
+        info = _uploads[fid]
+        file_path = Path(info["path"])
+        if file_path.exists():
+            pages = count_pages(file_path)
+            _active_pdf["path"] = file_path
+            _active_pdf["pages"] = pages
+            _active_pdf["file_id"] = fid
+
+
 @app.on_event("startup")
 async def startup():
     config.upload_dir.mkdir(parents=True, exist_ok=True)
+    _load_recent()
+    _load_last_active()
 
 
 def _get_active_pdf():
@@ -44,7 +115,7 @@ async def upload(file: UploadFile = File(...)):
     dest.write_bytes(content)
     pages = count_pages(dest)
     _uploads[file_id] = {
-        "path": dest,
+        "path": str(dest),
         "filename": file.filename,
         "pages": pages,
         "ts": time.time(),
@@ -52,6 +123,8 @@ async def upload(file: UploadFile = File(...)):
     _active_pdf["path"] = dest
     _active_pdf["pages"] = pages
     _active_pdf["file_id"] = file_id
+    _save_recent()
+    _save_last_active()
     return {"filename": file.filename, "pages": pages, "file_id": file_id}
 
 
@@ -74,14 +147,42 @@ async def open_file(file_id: str):
     if file_id not in _uploads:
         raise HTTPException(404, "File not found")
     info = _uploads[file_id]
-    if not info["path"].exists():
-        raise HTTPException(410, "File no longer exists on server")
-    pages = count_pages(info["path"])
+    file_path = Path(info["path"])
+    if not file_path.exists():
+        raise HTTPException(410, "File no longer exists on disk")
+    pages = count_pages(file_path)
     info["pages"] = pages
-    _active_pdf["path"] = info["path"]
+    _active_pdf["path"] = file_path
     _active_pdf["pages"] = pages
     _active_pdf["file_id"] = file_id
+    _save_last_active()
     return {"filename": info["filename"], "pages": pages, "file_id": file_id}
+
+
+@app.post("/open-path")
+async def open_path(body: dict):
+    file_path = Path(body.get("path", ""))
+    if not file_path.is_absolute():
+        raise HTTPException(400, "Path must be absolute")
+    if not file_path.exists():
+        raise HTTPException(404, "File not found")
+    if not file_path.suffix.lower() == ".pdf":
+        raise HTTPException(400, "Only PDF files allowed")
+
+    file_id = str(uuid.uuid4())[:8]
+    pages = count_pages(file_path)
+    _uploads[file_id] = {
+        "path": str(file_path),
+        "filename": file_path.name,
+        "pages": pages,
+        "ts": time.time(),
+    }
+    _active_pdf["path"] = file_path
+    _active_pdf["pages"] = pages
+    _active_pdf["file_id"] = file_id
+    _save_recent()
+    _save_last_active()
+    return {"filename": file_path.name, "pages": pages, "file_id": file_id}
 
 
 @app.get("/info")

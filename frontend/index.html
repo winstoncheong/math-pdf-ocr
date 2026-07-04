@@ -17,9 +17,13 @@
         <input type="file" id="fileInput" accept=".pdf">
       </label>
       <div id="recentWrap" class="dropdown-wrap">
-        <button id="recentBtn" disabled title="Reopen a previously uploaded file">Recent &#9662;</button>
+        <button id="recentBtn" title="Reopen a previously uploaded file">Recent &#9662;</button>
         <div id="recentList" class="dropdown"></div>
       </div>
+      <span id="openPathWrap">
+        <input type="text" id="pathInput" placeholder="/path/to/file.pdf" size="25">
+        <button id="openPathBtn">Open path</button>
+      </span>
       <span class="sep"></span>
       <span id="jumpWrap">
         Page: <input type="number" id="pageJump" min="1" value="1" disabled>

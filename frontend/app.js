@@ -126,6 +126,33 @@ $('fileInput').addEventListener('change', async e => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Open by path                                                       */
+/* ------------------------------------------------------------------ */
+$('openPathBtn').addEventListener('click', async () => {
+  const path = $('pathInput').value.trim();
+  if (!path) return;
+  try {
+    const r = await fetch('/open-path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    if (!r.ok) { alert('Failed to open: ' + (await r.text())); return; }
+    const data = await r.json();
+    openPdf(data.pages);
+    await loadBackends();
+    loadRecentFiles();
+    $('pathInput').value = '';
+  } catch (err) {
+    alert('Error opening file: ' + err.message);
+  }
+});
+
+$('pathInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('openPathBtn').click();
+});
+
+/* ------------------------------------------------------------------ */
 /*  Core: build / open / reload pages                                  */
 /* ------------------------------------------------------------------ */
 function openPdf(pages) {
@@ -411,6 +438,25 @@ window.addEventListener('resize', () => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Scroll position persistence                                        */
+/* ------------------------------------------------------------------ */
+let _scrollSaveTimer = null;
+window.addEventListener('scroll', () => {
+  if (!state.pdfLoaded) return;
+  clearTimeout(_scrollSaveTimer);
+  _scrollSaveTimer = setTimeout(() => {
+    const pages = $$('.pdf-page');
+    for (const p of pages) {
+      const rect = p.getBoundingClientRect();
+      if (rect.top >= -100 && rect.top < window.innerHeight / 2) {
+        localStorage.setItem('scrollPos', p.dataset.page);
+        return;
+      }
+    }
+  }, 200);
+});
+
+/* ------------------------------------------------------------------ */
 /*  Recent files                                                       */
 /* ------------------------------------------------------------------ */
 async function loadRecentFiles() {
@@ -578,4 +624,19 @@ function hideLoading() {
 /* ------------------------------------------------------------------ */
 /*  Init                                                               */
 /* ------------------------------------------------------------------ */
-loadBackends();
+async function init() {
+  await loadBackends();
+  await loadRecentFiles();
+  try {
+    const r = await fetch('/info');
+    if (r.ok) {
+      const data = await r.json();
+      if (data.file_id) {
+        await reopenFile(data.file_id);
+        const saved = localStorage.getItem('scrollPos');
+        if (saved) scrollToPage(parseInt(saved));
+      }
+    }
+  } catch { }
+}
+init();
