@@ -119,7 +119,7 @@ class TexifyEngine(OCREngine):
         if self._loaded:
             return True
         try:
-            import texify  # noqa: F401
+            import transformers  # noqa: F401
             return True
         except ImportError:
             return False
@@ -127,19 +127,20 @@ class TexifyEngine(OCREngine):
     def _load(self):
         if self._loaded:
             return
-        from texify.model.model import load_model
-        from texify.model.processor import load_processor
-        logger.info("Loading texify model...")
-        self._processor = load_processor()
-        self._model = load_model()
+        from transformers import VisionEncoderDecoderModel, AutoProcessor
+        logger.info("Loading texify model from HuggingFace...")
+        self._model = VisionEncoderDecoderModel.from_pretrained("vikp/texify")
+        self._processor = AutoProcessor.from_pretrained("vikp/texify")
         self._loaded = True
         logger.info("Texify model loaded")
 
     def recognize(self, image: Image.Image) -> str:
         self._load()
-        from texify.inference import batch_inference
-        results = batch_inference([image.convert("RGB")], self._model, self._processor)
-        return results[0] if results else ""
+        import torch
+        pixel_values = self._processor(images=image.convert("RGB"), return_tensors="pt").pixel_values
+        with torch.no_grad():
+            outputs = self._model.generate(pixel_values)
+        return self._processor.decode(outputs[0], skip_special_tokens=True)
 
 
 OLLAMA_DEFAULT_MODEL = "llava"
