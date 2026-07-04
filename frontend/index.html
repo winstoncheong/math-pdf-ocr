@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math PDF OCR</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Math PDF OCR</h1>
+    <div id="toolbar">
+      <label class="upload-btn">
+        Open PDF
+        <input type="file" id="fileInput" accept=".pdf">
+      </label>
+      <span id="pageInfo"></span>
+      <button id="prevPage" disabled>&larr; Prev</button>
+      <button id="nextPage" disabled>Next &rarr;</button>
+      <span id="dpiControl">
+        DPI:
+        <input type="range" id="dpiSlider" min="100" max="400" value="200" step="50">
+        <span id="dpiValue">200</span>
+      </span>
+      <span id="backendControl">
+        OCR:
+        <select id="backendSelect"></select>
+      </span>
+      <button id="clearBtn" disabled>Clear results</button>
+    </div>
+  </header>
+  <main id="main">
+    <section id="viewer">
+      <div id="pageContainer">
+        <div id="selectionOverlay">
+          <canvas id="selectionCanvas"></canvas>
+        </div>
+        <img id="pageImage" alt="PDF page">
+        <div id="selectionInfo">Click and drag to select a region for OCR</div>
+      </div>
+    </section>
+    <aside id="results">
+      <h2>OCR Results</h2>
+      <div id="resultsList"></div>
+    </aside>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
