@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import re
 import sys
 import time
 import uuid
@@ -203,6 +204,15 @@ async def get_page(page_num: int, dpi: int = Query(default=200, ge=72, le=600)):
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
+def _fix_katex(text: str) -> str:
+    text = re.sub(r'\\operatorname\*', r'\\operatorname', text)
+    text = re.sub(r'\\(?:Bigg?|bigg?)\{(.*?)\}', r'\1', text)
+    text = re.sub(r'\\tag\{.*?\}', '', text)
+    text = re.sub(r'\\quad\\mbox\{(.*?)\}', r'\1', text)
+    text = re.sub(r'\\mbox\{(.*?)\}', r'\1', text)
+    return text
+
+
 @app.post("/ocr")
 async def ocr_region(
     page_num: int,
@@ -228,6 +238,7 @@ async def ocr_region(
     actual_ocr_dpi = ocr_dpi if ocr_dpi > 0 else config.ocr_dpi
     crop = extract_region(path, page_num, x1, y1, x2, y2, render_dpi=dpi, ocr_dpi=actual_ocr_dpi)
     latex = engine.recognize(crop)
+    latex = _fix_katex(latex)
     return {"latex": latex, "backend": engine_name, "ocr_dpi": actual_ocr_dpi}
 
 

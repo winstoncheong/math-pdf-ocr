@@ -106,13 +106,10 @@ class NougatEngine(OCREngine):
 
 class TexifyEngine(OCREngine):
     MODEL_ID = "vikp/texify"
-    IMG_SIZE = (420, 420)
-    MEAN = [0.485, 0.456, 0.406]
-    STD = [0.229, 0.224, 0.225]
 
     def __init__(self):
         self._model = None
-        self._tokenizer = None
+        self._processor = None
         self._loaded = False
 
     @property
@@ -125,6 +122,7 @@ class TexifyEngine(OCREngine):
             return True
         try:
             import transformers  # noqa: F401
+            import texify  # noqa: F401
             return True
         except ImportError:
             return False
@@ -132,35 +130,36 @@ class TexifyEngine(OCREngine):
     def _load(self):
         if self._loaded:
             return
-        from transformers import VisionEncoderDecoderModel, NougatTokenizerFast
+        from texify.model.model import GenerateVisionEncoderDecoderModel
+        from texify.model.processor import load_processor
         logger.info("Loading texify model from HuggingFace...")
-        self._model = VisionEncoderDecoderModel.from_pretrained(self.MODEL_ID)
-        self._tokenizer = NougatTokenizerFast.from_pretrained(self.MODEL_ID)
+        self._model = GenerateVisionEncoderDecoderModel.from_pretrained(self.MODEL_ID)
+        self._processor = load_processor()
         self._loaded = True
         logger.info("Texify model loaded")
-
-    def _preprocess(self, image: Image.Image):
-        import numpy as np
-        img = image.convert("RGB").resize(self.IMG_SIZE, Image.BICUBIC)
-        arr = np.array(img, dtype=np.float32) / 255.0
-        mean = np.array(self.MEAN, dtype=np.float32)
-        std = np.array(self.STD, dtype=np.float32)
-        arr = (arr - mean) / std
-        import torch
-        return torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0)
 
     def recognize(self, image: Image.Image) -> str:
         self._load()
         import torch
-        pixel_values = self._preprocess(image)
-        decoder_input_ids = self._tokenizer("<s>", return_tensors="pt").input_ids
+        from texify.output import postprocess, replace_katex_invalid
+        images = [image.convert("RGB")]
+        encodings = self._processor(
+            images=images, return_tensors="pt", add_special_tokens=False
+        )
+        pixel_values = encodings["pixel_values"].to(self._model.dtype)
+        pixel_values = pixel_values.to(self._model.device)
         with torch.no_grad():
-            outputs = self._model.generate(
+            generated_ids = self._model.generate(
                 pixel_values=pixel_values,
-                decoder_input_ids=decoder_input_ids,
-                max_length=512,
+                max_new_tokens=384,
+                decoder_start_token_id=self._processor.tokenizer.bos_token_id,
             )
-        return self._tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        text = self._processor.tokenizer.decode(
+            generated_ids[0], skip_special_tokens=True
+        )
+        text = postprocess(text)
+        text = replace_katex_invalid(text)
+        return text.strip()
 
 
 OLLAMA_DEFAULT_MODEL = "llava"

@@ -542,6 +542,7 @@ function renderResults() {
     const ts = r.ts ? r.ts.toLocaleTimeString() : '';
     const preview = r.previewUrl ? `<img class="result-preview" src="${r.previewUrl}" alt="Selected region">` : '';
     const toggleBtn = r.status === 'done' ? `<button class="result-raw-toggle" onclick="toggleResultRaw(${i})" title="Toggle raw/rendered view">${r.showRaw ? 'Render' : 'Raw'}</button>` : '';
+    const resendBtn = (r.pageNum !== undefined && r.x1 !== undefined) ? `<button onclick="resendResult(${i})" title="Re-run OCR with current backend">Resend</button>` : '';
     return `<div class="result-card">
       <div class="result-header">
         <span>${ts}</span>
@@ -553,6 +554,7 @@ function renderResults() {
       ${preview}
       <div class="result-latex">${rendered}</div>
       <div class="result-actions">
+        ${resendBtn}
         ${r.status === 'done' ? `<button onclick="copyResult(${i})">Copy LaTeX</button>` : ''}
         <button onclick="removeResult(${i})">Remove</button>
       </div>
@@ -574,6 +576,12 @@ function copyResult(i) {
 function removeResult(i) {
   state.results.splice(i, 1);
   renderResults();
+}
+
+function resendResult(i) {
+  const r = state.results[i];
+  if (!r || r.pageNum === undefined) return;
+  enqueueOcr(r.pageNum, r.x1, r.y1, r.x2, r.y2, r.previewUrl);
 }
 
 function escapeHtml(str) {
