@@ -42,6 +42,17 @@ header h1 {
   flex: 1;
 }
 
+.info-text {
+  font-size: 13px;
+  color: #a0a0b0;
+}
+
+.sep {
+  width: 1px;
+  height: 20px;
+  background: #0f3460;
+}
+
 .upload-btn {
   background: #e94560;
   color: #fff;
@@ -75,12 +86,105 @@ header h1 {
   background: #1a4a7a;
 }
 
-#pageInfo {
-  font-size: 13px;
-  color: #a0a0b0;
-  min-width: 60px;
+/* --- dropdown (Recent files) --- */
+.dropdown-wrap {
+  position: relative;
 }
 
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 240px;
+  background: #1a1a3e;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  z-index: 200;
+  display: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dropdown.open {
+  display: block;
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid #0f3460;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #0f3460;
+}
+
+.dropdown-item .dfn {
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-item .dpg {
+  color: #888;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.dropdown-empty {
+  padding: 16px;
+  text-align: center;
+  color: #555;
+  font-size: 13px;
+}
+
+/* --- page jump --- */
+#jumpWrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #a0a0b0;
+}
+
+#pageJump {
+  width: 48px;
+  padding: 3px 4px;
+  background: #0d0d1a;
+  color: #e0e0e0;
+  border: 1px solid #0f3460;
+  border-radius: 3px;
+  font-size: 13px;
+  text-align: center;
+}
+
+#pageJump:disabled {
+  opacity: 0.4;
+}
+
+#pageJump:focus {
+  outline: none;
+  border-color: #e94560;
+}
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  opacity: 1;
+  height: 20px;
+}
+
+/* --- DPI --- */
 #dpiControl {
   display: flex;
   align-items: center;
@@ -102,6 +206,7 @@ header h1 {
   font-size: 13px;
 }
 
+/* --- main layout --- */
 #main {
   display: flex;
   flex: 1;
@@ -111,36 +216,51 @@ header h1 {
 #viewer {
   flex: 1;
   overflow: auto;
-  display: flex;
-  justify-content: center;
-  padding: 16px;
   background: #111;
 }
 
-#pageContainer {
-  position: relative;
-  display: inline-block;
-  box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+#pagesContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  gap: 24px;
 }
 
-#pageImage {
+/* --- page card --- */
+.pdf-page {
+  background: #1a1a2e;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.page-label {
+  text-align: center;
+  padding: 6px 0;
+  font-size: 12px;
+  color: #666;
+  background: #0d0d1a;
+  user-select: none;
+}
+
+.page-content {
+  position: relative;
+  display: inline-block;
+}
+
+.page-content img {
   display: block;
-  max-width: 100%;
+  max-width: 75vw;
   height: auto;
   user-select: none;
   -webkit-user-drag: none;
 }
 
-#selectionOverlay {
+.page-content canvas {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-#selectionCanvas {
   width: 100%;
   height: 100%;
   display: block;
@@ -148,20 +268,7 @@ header h1 {
   cursor: crosshair;
 }
 
-#selectionInfo {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,0.7);
-  color: #aaa;
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
+/* --- results sidebar --- */
 #results {
   width: 380px;
   flex-shrink: 0;

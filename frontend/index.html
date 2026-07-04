@@ -16,9 +16,16 @@
         Open PDF
         <input type="file" id="fileInput" accept=".pdf">
       </label>
-      <span id="pageInfo"></span>
-      <button id="prevPage" disabled>&larr; Prev</button>
-      <button id="nextPage" disabled>Next &rarr;</button>
+      <div id="recentWrap" class="dropdown-wrap">
+        <button id="recentBtn" disabled title="Reopen a previously uploaded file">Recent &#9662;</button>
+        <div id="recentList" class="dropdown"></div>
+      </div>
+      <span class="sep"></span>
+      <span id="jumpWrap">
+        Page: <input type="number" id="pageJump" min="1" value="1" disabled>
+      </span>
+      <span id="pageCount" class="info-text"></span>
+      <span class="sep"></span>
       <span id="dpiControl">
         DPI:
         <input type="range" id="dpiSlider" min="100" max="400" value="200" step="50">
@@ -33,13 +40,7 @@
   </header>
   <main id="main">
     <section id="viewer">
-      <div id="pageContainer">
-        <div id="selectionOverlay">
-          <canvas id="selectionCanvas"></canvas>
-        </div>
-        <img id="pageImage" alt="PDF page">
-        <div id="selectionInfo">Click and drag to select a region for OCR</div>
-      </div>
+      <div id="pagesContainer"></div>
     </section>
     <aside id="results">
       <h2>OCR Results</h2>

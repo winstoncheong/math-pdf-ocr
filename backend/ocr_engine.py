@@ -37,8 +37,10 @@ class Pix2texEngine(OCREngine):
             return True
         try:
             import pix2tex  # noqa: F401
+            logger.info("pix2tex import OK at %s", pix2tex.__file__)
             return True
-        except ImportError:
+        except ImportError as e:
+            logger.warning("pix2tex import failed: %s", e)
             return False
 
     def _load(self):

@@ -1,5 +1,7 @@
 import io
 import logging
+import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -15,7 +17,8 @@ logger = logging.getLogger(__name__)
 config = Config()
 app = FastAPI(title="Math PDF OCR")
 
-_active_pdf: dict = {"path": None, "pages": 0}
+_uploads: dict[str, dict] = {}
+_active_pdf: dict = {"path": None, "pages": 0, "file_id": None}
 
 
 @app.on_event("startup")
@@ -34,21 +37,58 @@ async def upload(file: UploadFile = File(...)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files allowed")
     file_id = str(uuid.uuid4())[:8]
-    dest = config.upload_dir / f"{file_id}_{file.filename}"
+    dest = config.upload_dir / f"{file_id}.pdf"
     content = await file.read()
     if len(content) > config.max_upload_size_mb * 1024 * 1024:
         raise HTTPException(413, f"File exceeds {config.max_upload_size_mb}MB limit")
     dest.write_bytes(content)
     pages = count_pages(dest)
+    _uploads[file_id] = {
+        "path": dest,
+        "filename": file.filename,
+        "pages": pages,
+        "ts": time.time(),
+    }
     _active_pdf["path"] = dest
     _active_pdf["pages"] = pages
+    _active_pdf["file_id"] = file_id
     return {"filename": file.filename, "pages": pages, "file_id": file_id}
+
+
+@app.get("/files")
+async def list_files():
+    items = []
+    for fid, info in _uploads.items():
+        items.append({
+            "file_id": fid,
+            "filename": info["filename"],
+            "pages": info["pages"],
+            "ts": info.get("ts", 0),
+        })
+    items.sort(key=lambda x: x["ts"], reverse=True)
+    return {"files": items}
+
+
+@app.post("/open/{file_id}")
+async def open_file(file_id: str):
+    if file_id not in _uploads:
+        raise HTTPException(404, "File not found")
+    info = _uploads[file_id]
+    if not info["path"].exists():
+        raise HTTPException(410, "File no longer exists on server")
+    pages = count_pages(info["path"])
+    info["pages"] = pages
+    _active_pdf["path"] = info["path"]
+    _active_pdf["pages"] = pages
+    _active_pdf["file_id"] = file_id
+    return {"filename": info["filename"], "pages": pages, "file_id": file_id}
 
 
 @app.get("/info")
 async def info():
     path = _get_active_pdf()
-    return {"filename": path.name, "pages": _active_pdf["pages"]}
+    fid = _active_pdf.get("file_id", "")
+    return {"filename": path.name, "pages": _active_pdf["pages"], "file_id": fid}
 
 
 @app.get("/page/{page_num}")
@@ -90,7 +130,20 @@ async def ocr_region(
 
 @app.get("/backends")
 async def backends():
-    return {"backends": list_engines()}
+    engines = list_engines()
+    try:
+        import pix2tex as _pt
+        px_path = _pt.__file__
+    except ImportError:
+        px_path = None
+    return {
+        "backends": engines,
+        "debug": {
+            "sys_executable": sys.executable,
+            "python": sys.version,
+            "pix2tex_path": px_path,
+        },
+    }
 
 
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
