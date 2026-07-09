@@ -15,6 +15,16 @@ uv run python run.py --reload --open
 
 Server runs at `http://127.0.0.1:8000`.
 
+### Access from other devices on your network
+
+Bind to `0.0.0.0` to accept connections from your LAN:
+
+```bash
+uv run python run.py --host 0.0.0.0 [--port nnnn]
+```
+
+Then connect from another device using your machine's LAN IP, e.g. `http://<your-lan-ip>:<port>`.
+
 ## OCR engines
 
 | Engine | Type | Install |
