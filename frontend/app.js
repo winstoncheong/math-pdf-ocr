@@ -3,7 +3,7 @@ const state = {
   totalPages: 0,
   dpi: 200,
   ocrDpi: 600,
-  backend: 'texify',
+  backend: 'texify-onnx',
   results: [],
   pageStates: {},
   activePage: null,
@@ -115,8 +115,8 @@ async function loadBackends() {
     // Preserve current selection if still available, otherwise pick a default
     if (state.backend && avail.find(b => b.name === state.backend)) {
       // keep state.backend as-is
-    } else if (avail.find(b => b.name === 'texify')) {
-      state.backend = 'texify';
+    } else if (avail.find(b => b.name === 'texify-onnx')) {
+      state.backend = 'texify-onnx';
     } else if (avail.length) {
       state.backend = avail[0].name;
     } else {
@@ -635,7 +635,18 @@ function toggleResultRaw(i) {
 
 function copyResult(i) {
   const r = state.results[i];
-  if (r && r.latex) navigator.clipboard.writeText(r.latex).catch(() => {});
+  if (!r || !r.latex) return;
+  const text = r.latex;
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
 }
 
 function removeResult(i) {
@@ -671,7 +682,7 @@ async function openCreateTest(i) {
   try {
     const params = new URLSearchParams({
       page_num: r.pageNum, x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2,
-      dpi: state.dpi, ocr_dpi: state.ocrDpi, backend: 'texify',
+      dpi: state.dpi, ocr_dpi: state.ocrDpi, backend: 'texify-onnx',
     });
     const resp = await fetch('/ocr?' + params.toString(), { method: 'POST' });
     if (resp.ok) {
