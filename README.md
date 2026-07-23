@@ -39,9 +39,20 @@ Ollama engines need a running Ollama server at `127.0.0.1:11434`.
 
 ## Features
 
+### PDF View
 - Upload or open PDFs by file path
 - Navigate pages, jump to page number
 - Select any region on a page to OCR it
+- Scrolling memory management — only keeps ~40 pages loaded at a time (frees decoded images for distant pages)
+- Backend LRU cache (30 entries) — re-visiting recently viewed pages avoids re-render
+
+### Image OCR
+- Switch to the **Image OCR** tab to paste (Ctrl+V), drag & drop, or upload a screenshot
+- Runs the full image through the selected OCR engine
+- Results appear inline and in the shared results panel
+- Useful for quick one-off OCR from screenshots, photos, or cropped regions
+
+### Results
 - LaTeX output rendered inline with KaTeX
 - Toggle between raw LaTeX and rendered view
 - Copy LaTeX to clipboard
@@ -72,15 +83,31 @@ Test cases live in `test-data/` as `<name>.png` + `<name>.tex` pairs. Create the
 backend/
   main.py          FastAPI app, endpoints, KaTeX fixup
   ocr_engine.py    OCR engine implementations
-  pdf_utils.py     PyMuPDF rendering and region extraction
+  pdf_utils.py     PyMuPDF rendering, region extraction, LRU page cache
   config.py        App configuration
 frontend/
-  index.html       Page layout and modal
-  app.js           UI logic, KaTeX rendering, state persistence
+  index.html       Page layout, tabs, and modals
+  app.js           UI logic, KaTeX rendering, state persistence, page windowing
   style.css        Dark theme styles
 test-data/         Test images and expected LaTeX
 test-results/      Test run logs (gitignored)
+math-pdf-ocr.service  systemd user service for production deployment
 ```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/upload` | Upload a PDF |
+| GET | `/files` | List uploaded files |
+| POST | `/open/{file_id}` | Reopen a previous file |
+| POST | `/open-path` | Open PDF by server path |
+| GET | `/info` | Active PDF info |
+| GET | `/page/{page_num}` | Render page as PNG |
+| POST | `/ocr` | OCR a region on a page |
+| POST | `/api/ocr-image` | OCR an uploaded image (screenshot) |
+| GET | `/backends` | List available OCR engines |
+| POST | `/save-test` | Save a test case |
 
 ## Dependencies
 

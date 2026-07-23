@@ -21,7 +21,10 @@ Server runs at `http://127.0.0.1:8000` by default.
   - `texify` — local ML model, requires `uv sync --extra texify`
   - `ollama/llava`, `ollama/glm-ocr`, `ollama/qwen3-vl:8b` — calls local Ollama API at `127.0.0.1:11434`
 - **PDF rendering**: `backend/pdf_utils.py` uses PyMuPDF (`fitz`). Uploaded PDFs stored in `uploads/` (gitignored).
+- **Page render cache**: `backend/pdf_utils.py` has an LRU cache (`OrderedDict`, max 30 entries) keyed by `(pdf_path, page_num, dpi)`. Avoids re-rendering recently viewed pages.
 - **KaTeX fixup**: `_fix_katex()` in `main.py` strips KaTeX-incompatible syntax (`\operatorname*`, `\Bigg`, `\tag`, `\mbox`) from all engine outputs before returning.
+- **Frontend page windowing**: `frontend/app.js` keeps only `currentPage ± PAGE_BUFFER` (20) pages loaded at any time. Pages outside this window have their `<img>` and `<canvas>` cleared to free memory. The current page is determined via `elementFromPoint` (O(1), no DOM iteration).
+- **Image OCR tab**: Separate mode in the viewer (`frontend/index.html` tab bar). Accepts image paste (Ctrl+V), drag & drop, or file upload. Sends to `POST /api/ocr-image` which runs the full image through the selected OCR engine. Results appear in the shared results panel.
 
 ## Dependencies & Python
 
