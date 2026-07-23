@@ -896,6 +896,104 @@ function hideLoading() {
 })();
 
 /* ------------------------------------------------------------------ */
+/*  Image OCR tab                                                     */
+/* ------------------------------------------------------------------ */
+let _imageOcrFile = null;
+let _imageOcrDataUrl = null;
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    $('pagesContainer').style.display = tab === 'pdf' ? '' : 'none';
+    $('imageOcrZone').style.display = tab === 'image' ? '' : 'none';
+  });
+});
+
+$('imageOcrInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) loadImageToOcr(file);
+});
+
+$('imageOcrDropzone').addEventListener('dragover', e => { e.preventDefault(); });
+$('imageOcrDropzone').addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadImageToOcr(file);
+});
+
+$('imageOcrDropzone').addEventListener('click', () => {
+  $('imageOcrInput').click();
+});
+
+document.addEventListener('paste', e => {
+  if ($('imageOcrZone').style.display === 'none') return;
+  const items = e.clipboardData.items;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      loadImageToOcr(item.getAsFile());
+      e.preventDefault();
+      return;
+    }
+  }
+});
+
+function loadImageToOcr(file) {
+  _imageOcrFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _imageOcrDataUrl = e.target.result;
+    $('imageOcrImg').src = _imageOcrDataUrl;
+    $('imageOcrDropzone').style.display = 'none';
+    $('imageOcrPreview').style.display = '';
+    $('imageOcrResult').innerHTML = '';
+    $('imageOcrRunBtn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+$('imageOcrRunBtn').addEventListener('click', async () => {
+  if (!_imageOcrFile && !_imageOcrDataUrl) return;
+  const btn = $('imageOcrRunBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running OCR...';
+
+  const form = new FormData();
+  if (_imageOcrFile) {
+    form.append('file', _imageOcrFile);
+  } else {
+    const resp = await fetch(_imageOcrDataUrl);
+    form.append('file', await resp.blob(), 'screenshot.png');
+  }
+
+  try {
+    const r = await fetch('/ocr-image?backend=' + encodeURIComponent(state.backend), { method: 'POST', body: form });
+    if (!r.ok) {
+      $('imageOcrResult').innerHTML = '<pre class="raw-output">OCR error: ' + escapeHtml(await r.text()) + '</pre>';
+      return;
+    }
+    const data = await r.json();
+    $('imageOcrResult').innerHTML = '<pre class="raw-output">' + escapeHtml(data.latex) + '</pre>';
+    addResult(data.latex, data.backend, _imageOcrDataUrl);
+  } catch (err) {
+    $('imageOcrResult').innerHTML = '<pre class="raw-output">Request failed: ' + escapeHtml(err.message) + '</pre>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run OCR';
+  }
+});
+
+$('imageOcrClearBtn').addEventListener('click', () => {
+  _imageOcrFile = null;
+  _imageOcrDataUrl = null;
+  $('imageOcrDropzone').style.display = '';
+  $('imageOcrPreview').style.display = 'none';
+  $('imageOcrResult').innerHTML = '';
+  $('imageOcrInput').value = '';
+});
+
+/* ------------------------------------------------------------------ */
 /*  Init                                                               */
 /* ------------------------------------------------------------------ */
 async function init() {

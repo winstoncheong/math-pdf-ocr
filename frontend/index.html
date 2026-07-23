@@ -49,7 +49,25 @@
   </header>
   <main id="main">
     <section id="viewer">
+      <div id="viewerTabs">
+        <button class="tab-btn active" data-tab="pdf">PDF View</button>
+        <button class="tab-btn" data-tab="image">Image OCR</button>
+      </div>
       <div id="pagesContainer"></div>
+      <div id="imageOcrZone" style="display:none">
+        <div id="imageOcrDropzone">
+          <p>Paste an image (Ctrl+V), drag &amp; drop, or click to select</p>
+          <input type="file" id="imageOcrInput" accept="image/*">
+        </div>
+        <div id="imageOcrPreview" style="display:none">
+          <img id="imageOcrImg">
+          <div id="imageOcrActions">
+            <button id="imageOcrRunBtn">Run OCR</button>
+            <button id="imageOcrClearBtn">Clear</button>
+          </div>
+          <div id="imageOcrResult"></div>
+        </div>
+      </div>
     </section>
     <div id="splitDivider"></div>
     <aside id="results">

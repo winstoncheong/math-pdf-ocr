@@ -11,6 +11,8 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
+from PIL import Image
+
 from .config import Config
 from .pdf_utils import count_pages, extract_region, render_page
 from .ocr_engine import get_engine, list_engines
@@ -265,6 +267,41 @@ async def backends():
             "pix2tex_path": px_path,
         },
     }
+
+
+MAX_IMAGE_OCR_SIZE = 10 * 1024 * 1024
+
+
+@app.post("/api/ocr-image")
+async def ocr_image(
+    file: UploadFile = File(...),
+    backend: str = Query(default=""),
+):
+    image_data = await file.read()
+    if len(image_data) > MAX_IMAGE_OCR_SIZE:
+        raise HTTPException(413, "Image too large (max 10MB)")
+
+    logger.info("Received image OCR request: %d bytes, content_type=%s, filename=%s",
+                 len(image_data), file.content_type, file.filename)
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        img.load()
+        logger.info("Image decoded: format=%s size=%s mode=%s", img.format, img.size, img.mode)
+        img = img.convert("RGB")
+    except Exception as e:
+        logger.error("Failed to decode uploaded image (%d bytes): %s", len(image_data), e)
+        raise HTTPException(400, f"Could not decode image ({e}). Supported formats: PNG, JPEG, GIF, BMP, TIFF")
+
+    engine_name = backend or config.default_backend
+    engine = get_engine(engine_name)
+    if engine is None:
+        raise HTTPException(400, f"Unknown backend '{engine_name}'")
+    if not engine.available:
+        raise HTTPException(400, f"Backend '{engine_name}' is not installed")
+
+    latex = engine.recognize(img)
+    latex = _fix_katex(latex)
+    return {"latex": latex, "backend": engine_name}
 
 
 TEST_DIR = Path(__file__).resolve().parent.parent / "test-data"

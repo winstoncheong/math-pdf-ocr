@@ -1,0 +1,16 @@
+[Unit]
+Description=Math PDF OCR
+After=network.target
+
+[Service]
+Type=simple
+User=winston
+WorkingDirectory=/home/winston/projects/math-pdf-ocr
+ExecStart=/home/winston/.local/bin/uv run python run.py --host 0.0.0.0 --port 8080 --ssl-certfile /home/winston/192.168.1.157+2.pem --ssl-keyfile /home/winston/192.168.1.157+2-key.pem
+Restart=on-failure
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
