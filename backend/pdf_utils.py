@@ -1,10 +1,23 @@
+from collections import OrderedDict
 from pathlib import Path
 
 import fitz
 from PIL import Image, ImageEnhance
 
+_render_cache: OrderedDict = OrderedDict()
+PAGE_CACHE_SIZE = 30
+
+
+def _cache_key(pdf_path: Path, page_num: int, dpi: int) -> tuple:
+    return (str(pdf_path), page_num, dpi)
+
 
 def render_page(pdf_path: Path, page_num: int, dpi: int = 200) -> tuple[Image.Image, tuple[int, int, int, int]]:
+    key = _cache_key(pdf_path, page_num, dpi)
+    if key in _render_cache:
+        _render_cache.move_to_end(key)
+        return _render_cache[key]
+
     doc = fitz.open(pdf_path)
     page = doc[page_num]
     zoom = dpi / 72
@@ -13,7 +26,16 @@ def render_page(pdf_path: Path, page_num: int, dpi: int = 200) -> tuple[Image.Im
     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
     bbox = (0, 0, pix.width, pix.height)
     doc.close()
+
+    if len(_render_cache) >= PAGE_CACHE_SIZE:
+        _render_cache.popitem(last=False)
+    _render_cache[key] = (img, bbox)
+
     return img, bbox
+
+
+def clear_page_cache():
+    _render_cache.clear()
 
 
 def extract_region(

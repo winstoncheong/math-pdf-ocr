@@ -1,3 +1,5 @@
+const PAGE_BUFFER = 20;
+
 const state = {
   pdfLoaded: false,
   totalPages: 0,
@@ -12,6 +14,7 @@ const state = {
   ocrQueue: [],
   ocrRunning: 0,
   ocrMaxConcurrent: 3,
+  currentPage: 0,
 };
 
 const $ = id => document.getElementById(id);
@@ -38,6 +41,7 @@ async function scrollToPage(pageNum) {
   const viewer = $('viewer');
   viewer.scrollTop = el.offsetTop - $('pagesContainer').offsetTop;
   await new Promise(r => requestAnimationFrame(r));
+  prunePages();
 }
 
 /* ------------------------------------------------------------------ */
@@ -316,6 +320,48 @@ async function loadPage(pageNum) {
   ps.loaded = true;
 }
 
+function unloadPage(pageNum) {
+  const pageDiv = document.querySelector(`.pdf-page[data-page="${pageNum}"]`);
+  if (!pageDiv || pageDiv.dataset.loaded !== 'true') return;
+  pageDiv.dataset.loaded = 'false';
+  pageDiv.querySelector('img').src = '';
+  const canvas = pageDiv.querySelector('canvas');
+  canvas.width = 0;
+  canvas.height = 0;
+  const ps = getPageState(pageNum);
+  ps.loaded = false;
+  ps.renderedW = 0;
+  ps.renderedH = 0;
+}
+
+function getCurrentPage() {
+  const viewer = $('viewer');
+  const rect = viewer.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (const dy of [0, -60, 60, -120, 120]) {
+    const el = document.elementFromPoint(cx, cy + dy);
+    const pageDiv = el?.closest('.pdf-page');
+    if (pageDiv) return parseInt(pageDiv.dataset.page);
+  }
+  return state.currentPage;
+}
+
+function prunePages() {
+  if (!state.pdfLoaded) return;
+  const centerPage = getCurrentPage();
+  if (centerPage < 0) return;
+  state.currentPage = centerPage;
+  const windowStart = Math.max(0, centerPage - PAGE_BUFFER);
+  const windowEnd = Math.min(state.totalPages - 1, centerPage + PAGE_BUFFER);
+  for (const pageDiv of $$('.pdf-page[data-loaded="true"]')) {
+    const pageNum = parseInt(pageDiv.dataset.page);
+    if (pageNum < windowStart || pageNum > windowEnd) {
+      unloadPage(pageNum);
+    }
+  }
+}
+
 function resizePageCanvas(pageNum) {
   const pageDiv = document.querySelector(`.pdf-page[data-page="${pageNum}"]`);
   if (!pageDiv) return;
@@ -515,17 +561,11 @@ $('viewer').addEventListener('scroll', () => {
   if (!state.pdfLoaded) return;
   clearTimeout(_scrollSaveTimer);
   _scrollSaveTimer = setTimeout(() => {
-    const viewer = $('viewer');
-    const pages = $$('.pdf-page');
-    for (const p of pages) {
-      const rect = p.getBoundingClientRect();
-      const viewerRect = viewer.getBoundingClientRect();
-      const relTop = rect.top - viewerRect.top;
-      if (relTop >= -100 && relTop < viewerRect.height / 2) {
-        localStorage.setItem('scrollPos', p.dataset.page);
-        return;
-      }
+    const cur = getCurrentPage();
+    if (cur >= 0) {
+      localStorage.setItem('scrollPos', String(cur));
     }
+    prunePages();
   }, 200);
 });
 
