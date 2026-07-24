@@ -153,7 +153,7 @@ class TexifyEngine(OCREngine):
         with torch.no_grad():
             generated_ids = self._model.generate(
                 pixel_values=pixel_values,
-                max_new_tokens=384,
+                max_new_tokens=1024,
                 decoder_start_token_id=self._processor.tokenizer.bos_token_id,
             )
         text = self._processor.tokenizer.decode(
@@ -221,7 +221,7 @@ class TexifyOnnxEngine(OCREngine):
         with torch.no_grad():
             generated_ids = self._model.generate(
                 pixel_values=pixel_values,
-                max_new_tokens=384,
+                max_new_tokens=1024,
             )
         text = self._processor.tokenizer.decode(
             generated_ids[0], skip_special_tokens=True
