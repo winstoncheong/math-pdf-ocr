@@ -450,6 +450,72 @@ input[type=number]::-webkit-outer-spin-button {
   font-size: 14px;
 }
 
+/* --- bookmarks panel --- */
+#bookmarks {
+  width: 260px;
+  min-width: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #0f3460;
+  background: #16213e;
+  overflow: hidden;
+  transition: width 0.2s ease, min-width 0.2s ease, border-color 0.2s ease;
+}
+
+#bookmarks.collapsed {
+  width: 0;
+  min-width: 0;
+  border-right: none;
+}
+
+.bookmarks-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+.bookmarks-header h3 {
+  font-size: 14px;
+  color: #e94560;
+  margin: 0;
+}
+
+#bookmarksList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.bookmarks-empty {
+  padding: 16px;
+  text-align: center;
+  color: #555;
+  font-size: 13px;
+}
+
+.bookmark-item {
+  padding: 5px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #c0c0c0;
+}
+
+.bookmark-item:hover {
+  background: #0f3460;
+  color: #e0e0e0;
+}
+
+#bookmarksBtn.active {
+  background: #e94560;
+  border-color: #e94560;
+  color: #fff;
+}
+
 #loading {
   position: fixed;
   top: 50%;

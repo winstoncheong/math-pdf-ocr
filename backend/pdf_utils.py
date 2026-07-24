@@ -75,3 +75,10 @@ def count_pages(pdf_path: Path) -> int:
     n = doc.page_count
     doc.close()
     return n
+
+
+def get_bookmarks(pdf_path: Path) -> list[dict]:
+    doc = fitz.open(pdf_path)
+    toc = doc.get_toc(simple=True)
+    doc.close()
+    return [{"level": entry[0], "title": entry[1], "page": entry[2]} for entry in toc]

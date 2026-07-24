@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 from .config import Config
-from .pdf_utils import count_pages, extract_region, render_page
+from .pdf_utils import count_pages, extract_region, get_bookmarks, render_page
 from .ocr_engine import get_engine, list_engines
 
 logger = logging.getLogger(__name__)
@@ -197,6 +197,12 @@ async def info():
     path = _get_active_pdf()
     fid = _active_pdf.get("file_id", "")
     return {"filename": path.name, "pages": _active_pdf["pages"], "file_id": fid}
+
+
+@app.get("/bookmarks")
+async def bookmarks():
+    path = _get_active_pdf()
+    return {"bookmarks": get_bookmarks(path)}
 
 
 @app.get("/page/{page_num}")

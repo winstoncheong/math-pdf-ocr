@@ -15,6 +15,7 @@ const state = {
   ocrRunning: 0,
   ocrMaxConcurrent: 3,
   currentPage: 0,
+  bookmarksVisible: false,
 };
 
 const $ = id => document.getElementById(id);
@@ -43,6 +44,49 @@ async function scrollToPage(pageNum) {
   await new Promise(r => requestAnimationFrame(r));
   prunePages();
 }
+
+/* ------------------------------------------------------------------ */
+/*  Bookmarks                                                          */
+/* ------------------------------------------------------------------ */
+async function loadBookmarks() {
+  try {
+    const r = await fetch('/bookmarks');
+    if (!r.ok) {
+      renderBookmarks([]);
+      return;
+    }
+    const data = await r.json();
+    renderBookmarks(data.bookmarks || []);
+  } catch {
+    renderBookmarks([]);
+  }
+}
+
+function renderBookmarks(bookmarks) {
+  const list = $('bookmarksList');
+  if (!bookmarks.length) {
+    list.innerHTML = '<div class="bookmarks-empty">No bookmarks found</div>';
+    return;
+  }
+  list.innerHTML = bookmarks.map(b => {
+    const indent = Math.max(0, b.level - 1) * 16;
+    const page = Math.max(0, (b.page || 1) - 1);
+    return `<div class="bookmark-item" data-page="${page}" style="padding-left: ${8 + indent}px;" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</div>`;
+  }).join('');
+  for (const item of list.querySelectorAll('.bookmark-item')) {
+    item.addEventListener('click', () => {
+      const page = parseInt(item.dataset.page);
+      scrollToPage(page);
+      $('pageJump').value = page + 1;
+    });
+  }
+}
+
+$('bookmarksBtn').addEventListener('click', () => {
+  state.bookmarksVisible = !state.bookmarksVisible;
+  $('bookmarks').classList.toggle('collapsed', !state.bookmarksVisible);
+  $('bookmarksBtn').classList.toggle('active', state.bookmarksVisible);
+});
 
 /* ------------------------------------------------------------------ */
 /*  LocalStorage persistence                                           */
@@ -237,10 +281,14 @@ function openPdf(pages) {
   renderResults();
   $('clearBtn').disabled = false;
   $('recentBtn').disabled = false;
+  $('bookmarksBtn').disabled = false;
   jumpInput.disabled = false;
   jumpInput.value = 1;
   $('pageCount').textContent = `\u2009/\u2009${pages}`;
+  $('bookmarks').classList.toggle('collapsed', !state.bookmarksVisible);
+  $('bookmarksBtn').classList.toggle('active', state.bookmarksVisible);
   buildPages();
+  loadBookmarks();
 }
 
 async function reopenFile(fileId) {
@@ -248,7 +296,7 @@ async function reopenFile(fileId) {
     const r = await fetch(`/open/${fileId}`, { method: 'POST' });
     if (!r.ok) { alert('Failed to reopen file'); return; }
     const data = await r.json();
-    openPdf(data.pages);
+    await openPdf(data.pages);
     await loadBackends();
   } catch (err) {
     alert('Error reopening file: ' + err.message);
@@ -908,6 +956,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const tab = btn.dataset.tab;
     $('pagesContainer').style.display = tab === 'pdf' ? '' : 'none';
     $('imageOcrZone').style.display = tab === 'image' ? '' : 'none';
+    if (tab === 'image') {
+      $('bookmarks').classList.add('collapsed');
+      $('bookmarksBtn').classList.remove('active');
+    } else if (state.bookmarksVisible && state.pdfLoaded) {
+      $('bookmarks').classList.remove('collapsed');
+      $('bookmarksBtn').classList.add('active');
+    }
   });
 });
 

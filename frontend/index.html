@@ -24,6 +24,7 @@
         <input type="text" id="pathInput" placeholder="/path/to/file.pdf" size="25">
         <button id="openPathBtn">Open path</button>
       </span>
+      <button id="bookmarksBtn" title="Toggle bookmarks panel" disabled>Bookmarks</button>
       <span class="sep"></span>
       <span id="jumpWrap">
         Page: <input type="number" id="pageJump" min="1" value="1" disabled>
@@ -48,6 +49,14 @@
     </div>
   </header>
   <main id="main">
+    <aside id="bookmarks" class="collapsed">
+      <div class="bookmarks-header">
+        <h3>Bookmarks</h3>
+      </div>
+      <div id="bookmarksList">
+        <div class="bookmarks-empty">No PDF loaded</div>
+      </div>
+    </aside>
     <section id="viewer">
       <div id="viewerTabs">
         <button class="tab-btn active" data-tab="pdf">PDF View</button>
