@@ -968,7 +968,7 @@ $('imageOcrRunBtn').addEventListener('click', async () => {
   }
 
   try {
-    const r = await fetch('/ocr-image?backend=' + encodeURIComponent(state.backend), { method: 'POST', body: form });
+    const r = await fetch('/api/ocr-image?backend=' + encodeURIComponent(state.backend), { method: 'POST', body: form });
     if (!r.ok) {
       $('imageOcrResult').innerHTML = '<pre class="raw-output">OCR error: ' + escapeHtml(await r.text()) + '</pre>';
       return;
